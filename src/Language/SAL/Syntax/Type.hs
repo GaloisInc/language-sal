@@ -1,12 +1,11 @@
-module SAL.Language.Type where
+module Language.SAL.Syntax.Type where
 
 
--- | Identifier := Letter {Letter | Digit | ? | _}∗
---               | {Opchar}+
+-- | Identifier := Letter {Letter | Digit | ? | _}∗ | {Opchar}+
 type Identifier = String
 
--- | Numeral    := {Digit}+
-type Numeral    = String
+-- | Numeral := {Digit}+
+type Numeral = String
 
 -- | SAL Type Definitions
 data TypeDef = TD Type
@@ -24,8 +23,17 @@ data Type = TyBasic BasicType              -- e.g. BOOLEAN
           | TyState SALModule              -- Module . STATE
 
 -- | Basic mathematical types
-data BasicType = BOOLEAN | REAL | INTEGER | NZINTEGER | NATURAL | NZREAL
+data BasicType = BOOLEAN
+               | REAL
+               | INTEGER
+               | NZINTEGER
+               | NATURAL
+               | NZREAL
   deriving (Eq, Show)
+
+-- | Bound in a SubRange expression
+data Bound = Unbounded         -- render as _
+           | Bound Expression  -- render as Expression
 
 type ScalarType = [Identifier]  -- {{Identifier}+, }
 
@@ -34,9 +42,6 @@ type DataType = [(Identifier, Maybe [(Identifier, Type)])]  -- DATATYPE Construc
 type Name = Identifier
 
 type SubRange = (Bound, Bound)  -- inline?
-
-data Bound = Unbounded         -- render as _
-           | Bound Expression  -- render as Expression
 
 type VarType = (Maybe Identifier, Type)  -- [identifier :] type
 
@@ -53,5 +58,3 @@ type VarType = (Maybe Identifier, Type)  -- [identifier :] type
 
 -- XXX do we need?
 -- data QualifiedName = undefined  -- Identifier[ {ActualParameters} ]!Identifier
-
-

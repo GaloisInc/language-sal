@@ -1,4 +1,4 @@
-module SAL.Language.Token where
+module Language.SAL.Syntax.Token where
 
 import Data.Char (chr)
 
