@@ -1,14 +1,55 @@
+{-|
+Module      : Language.SAL.Syntax
+Description : Data types for SAL Syntax
+Copyright   : (c) Galois Inc, 2015
+                  Benjamin F Jones, 2015
+License     : MIT
+Maintainer  : bjones@galois.com
+Stability   : experimental
+Portability : Yes
+
+Haskell encoding of the syntax presented in
+http://sal.csl.sri.com/doc/language-report.pdf
+-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 #define DERIVE deriving (Eq, Ord, Show, Typeable, Data)
 
-module Language.SAL.Syntax where
+module Language.SAL.Syntax (
+  -- * Types
+    TypeDef(..)
+  , Type(..)
+  , BasicType(..)
+  , VarDecl(..)
+  , Bound(..)
+  , ScalarType(..)
+  , DataType(..)
+  , Constructor(..)
+  , VarType(..)
+  , IndexType(..)
+  , IndexVarDecl(..)
+  , QualifiedName(..)
+  -- * Expressions
+  , Expr(..)
+  , Update(..)
+  , UpdatePos(..)
+  , Quantifier(..)
+  , LetDecl(..)
+  , RecordEntry(..)
+  , ThenRest(..)
+  , ElsIf(..)
+  -- * Modules
+  , Module(..)
+  , ModulePred(..)
+  )
+where
 
 import Data.Char (chr)
 import Data.List (union, (\\))
-import Data.Data
-import Data.Typeable
+import Data.Data (Data)
+import Data.Typeable (Typeable)
 import Data.List.NonEmpty (NonEmpty)
 
 
@@ -17,75 +58,78 @@ import Data.List.NonEmpty (NonEmpty)
 ------------------------------------------------------------------------
 
 -- | Identifier for a variable, operator, type, module, context, ...
--- Identifier := Letter {Letter | Digit | ? | _}∗ | {Opchar}+
+--  @Identifier := Letter {Letter | Digit | ? | _}∗ | {Opchar}+@
 type Identifier = String
 
--- | Numeral := {Digit}+
+-- | @Numeral := {Digit}+@
 type Numeral = String
 
 -- | SAL Type Definitions
 data TypeDef
     = TypeTypeDef   Type
     | ScalarTypeDef ScalarType
-    | DataTypeDef   SALDataType
+    | DataTypeDef   DataType
   DERIVE
 
 -- | SAL Types
 data Type
-    = TyBasic    BasicType         -- e.g. BOOLEAN
-    | TyName     Name              -- e.g. mytype
-    | TySubRange Bound      Bound  -- [a..b]
-    | TySubType  Identifier Type  Expr  -- { ident : type | expr }
-    | TyArray    IndexType  Type   -- ARRAY idx OF type
-    | TyFunction VarType    Type   -- [ var -> type ]
-    | TyRecord   VarDecls          -- [# {Identifier : Type}+, #]
-    | TyState    SALModule         -- Module . STATE
+    = TyBasic    BasicType         -- ^ built-in type, e.g. @BOOLEAN@
+    | TyName     Name              -- ^ named type, e.g. @mytype@
+    | TySubRange Bound      Bound  -- ^ subrange type, e.g. @[1..n]@
+    | TySubType  Identifier Type  Expr  -- ^ subset type, e.g. @{ ident : type | expr }@
+    | TyArray    IndexType  Type   -- ^ array type, e.g. @ARRAY idx OF type@
+    | TyFunction VarType    Type   -- ^ function type, e.g. @[ var -> type ]@
+    | TyRecord   VarDecls          -- ^ record type, e.g. @[# {Identifier : Type}+, #]@
+    | TyState    Module         -- ^ module state type, e.g. @MyModule . STATE@
   DERIVE
 
--- | Basic mathematical types
+-- | Basic built-in mathematical types
 data BasicType
     = BOOLEAN
     | REAL
     | INTEGER
-    | NZINTEGER  -- NZ means non-zero
-    | NATURAL
-    | NZREAL
+    | NZINTEGER  -- ^ non-zero integers
+    | NATURAL    -- ^ positive integers
+    | NZREAL     -- ^ non-zero real numbers
   DERIVE
 
 -- | A type name
 type Name = Identifier
 
--- | Variable declaration of the form: Identifier : Type
+-- | Variable declaration of the form: @Identifier : Type@
 data VarDecl = VarDecl Identifier Type
   DERIVE
 
-type VarDecls = NonEmpty VarDecl -- comma sep
+-- | Comma separated variable declarations
+type VarDecls = NonEmpty VarDecl
 
 -- | A Bound in a sub-range expression
 data Bound
-    = Unbounded   -- render as _
-    | Bound Expr  -- render as Expr
+    = Unbounded   -- ^ represents +/- inf depending on context, render as @_@
+    | Bound Expr  -- ^ an expression representing a finite bound, render as @Expr@
   DERIVE
 
--- | {{Identifier}+, }
+-- | Scalar type: @{{Identifier}+, }@
 data ScalarType = ScalarType (NonEmpty Identifier)
   DERIVE
 
--- | DATATYPE Constructors END
-data SALDataType    = SALDataType (NonEmpty Constructor) DERIVE
+-- | Algebraic data type: @DATATYPE Constructors END@
+data DataType    = DataType (NonEmpty Constructor) DERIVE
+-- | Data type constructors
 data Constructor = Constructor Identifier (Maybe VarDecls) DERIVE
 
--- | Variable type declaration: [identifier :] type
+-- | Variable type declaration: @[identifier :] type@
 data VarType = VarType (Maybe Identifier) Type DERIVE
 
 -- | IndexType is really a subtype of Type:
--- data IndexType = INTEGER | SubRange | ScalarTypeName
+--
+-- > data IndexType = INTEGER | SubRange | ScalarTypeName
 data IndexType = IndexType Type DERIVE
 
--- | Identifier : IndexType
+-- | Index variable declaration: @Identifier : IndexType@
 data IndexVarDecl = IndexVarDecl Identifier IndexType DERIVE
 
--- | Name of the form: Identifier[ {ActualParameters} ]!Identifier
+-- | Name of the form: @Identifier[ {ActualParameters} ]!Identifier@
 data QualifiedName = QualifiedName Identifier ActualParameters Identifier
   DERIVE
 
@@ -96,74 +140,67 @@ data QualifiedName = QualifiedName Identifier ActualParameters Identifier
 
 -- | SAL Expression type
 data Expr
-    = NameExpr Name
-    | QualifiedNameExpr QualifiedName
-    | NextVar Identifier           -- var'
+    = NameExpr Name                    -- ^ named expresssion
+    | QualifiedNameExpr QualifiedName  -- ^ qualified named expression
+    | NextVar Identifier               -- ^ transition variable: @var'@
     | Numeral Integer
-    | App Expr Argument            -- Function Argument
-    | InfixApp Expr Identifier Expr
-    | ArraySelec Expr Expr         -- Expr[Expr]
-    | RecordSelec Expr Identifier  -- Expr.Identifier
-    | TupleSelec Expr Numeral      -- Expr.Numeral
-    | UpdateExpr Expr Update       -- Expr WITH Update
-    | Lambda VarDecls Expr         -- LAMBDA (VarDecls) : Expr
-    | QuantifiedExpr Quantifier VarDecls Expr  -- Quantifier (VarDecls) : Expr
-    | LetExpr (NonEmpty LetDecl) Expr  -- LET LetDeclarations IN Expr
-    | SetExpr (Either SetPredExpr SetListExpr)  -- { id : ty | expr} or,
-                                                -- { expr1, expr2, ... }
-    | ArrayLit IndexVarDecl Expr   -- [[IndexVarDecl] Expr]
-    | RecordLit (NonEmpty RecordEntry)  -- (# {RecordEntry}+, #)
-    | TupleLit Argument
-    | Conditional Expr ThenRest    -- IF Expr ThenRest
-    | GroupedExpr Expr             -- ( Expr )
-    | StatePred Module ModulePred  -- Module . ( INIT | TRANS )
+    | App Expr Argument                -- ^ function application
+    | InfixApp Expr Identifier Expr    -- ^ infix function application
+    | ArraySelec Expr Expr             -- ^ array selection: @Expr[Expr]@
+    | RecordSelec Expr Identifier      -- ^ record selection: @Expr.Identifier@
+    | TupleSelec Expr Numeral          -- ^ tuple selection: @Expr.Numeral@
+    | UpdateExpr Expr Update           -- ^ update expression: @Expr WITH Update@
+    | Lambda VarDecls Expr             -- ^ lambda: @LAMBDA (VarDecls) : Expr@
+    | QuantifiedExpr Quantifier VarDecls Expr  -- ^ @Quantifier (VarDecls) : Expr@
+    | LetExpr (NonEmpty LetDecl) Expr  -- ^ let binding: @LET LetDeclarations IN Expr@
+    | SetExpr (Either SetPredExpr SetListExpr)  -- ^ set comprehension: @{ id : ty | expr}@ or,
+                                                -- @{ expr1, expr2, ... }@
+    | ArrayLit IndexVarDecl Expr       -- ^ array literal: @[[IndexVarDecl] Expr]@
+    | RecordLit (NonEmpty RecordEntry) -- ^ record literal: @(# {RecordEntry}+, #)@
+    | TupleLit Argument                -- ^ tuple literal
+    | Conditional Expr ThenRest        -- ^ conditional: @IF Expr ThenRest@
+    | GroupedExpr Expr                 -- ^ expression grouping: @( Expr )@
+    | StatePred Module ModulePred      -- ^ module predicate: @Module . ( INIT | TRANS )@
   DERIVE
 
 -- | Comma separated list of expressions
 type Argument = [Expr]
 
--- | Update expression of the form: UpdatePosition := Expr
+-- | Update expression of the form: @UpdatePosition := Expr@
 data Update = Update (NonEmpty UpdatePos) Expr
   DERIVE
 
--- | Elements which may appear in sequence in the UpdatePosition of an Update
--- expression: {Argument | [Expr] | .Identifier | .Numeral}+
+-- | Elements which may appear in sequence in the 'UpdatePosition' of an 'Update'
+-- expression: @{'Argument' | ['Expr'] | .'Identifier' | .'Numeral'}+@
 data UpdatePos
-    = ArgUpdate Argument      -- Expr1, Expr2, ...
-    | ExprUpdate Expr         -- [Expr]
-    | IdentUpdate Identifier  -- .Identifier
-    | NumUpdate Numeral       -- .Numeral
+    = ArgUpdate Argument      -- @Expr1, Expr2, ...@
+    | ExprUpdate Expr         -- @[Expr]@
+    | IdentUpdate Identifier  -- @.Identifier@
+    | NumUpdate Numeral       -- @.Numeral@
   DERIVE
 
+-- | Quantifier keyword
 data Quantifier = FORALL | EXISTS
   DERIVE
 
--- | Let declaration: {Identifier : Type = Expr}+,
+-- | Let declaration: @{Identifier : Type = Expr}+,@
 data LetDecl = LetDecl Identifier Type Expr
   DERIVE
 
-type SetPredExpr = (Identifier, Type, Expr)  -- { Identifier : Type | Expr }
-type SetListExpr = NonEmpty Expr             -- { expr1, expr2, ... }
+type SetPredExpr = (Identifier, Type, Expr)  -- ^ @{ Identifier : Type | Expr }@
+type SetListExpr = NonEmpty Expr             -- ^ @{ expr1, expr2, ... }@
 
--- | Identifier := Expr
+-- | Record entry: @Identifier := Expr@
 data RecordEntry = RecordEntry Identifier Expr
   DERIVE
 
--- | THEN Expr [ ElsIf ] ELSE Expr ENDIF
+-- | Continued conditional: @THEN 'Expr' [ 'ElsIf' ] ELSE 'Expr' ENDIF@
 data ThenRest = ThenRest Expr [ElsIf] Expr
   DERIVE
 
--- | ELSIF Expr ThenRest
+-- | More continued conditional: @ELSIF Expr ThenRest@
 data ElsIf = ElsIf Expr ThenRest
   DERIVE
-
--- XXX todo or put in other module
-data Module = Module
-  DERIVE
-
-data ModulePred = INIT | TRANS
-  DERIVE
-
 
 ------------------------------------------------------------------------
 -- Transitions
@@ -177,7 +214,12 @@ data ModulePred = INIT | TRANS
 ------------------------------------------------------------------------
 
 -- TODO
-data SALModule = SALModule
+data Module = Module
+  DERIVE
+
+-- | Module predicate
+-- XXX what is this for?
+data ModulePred = INIT | TRANS
   DERIVE
 
 
