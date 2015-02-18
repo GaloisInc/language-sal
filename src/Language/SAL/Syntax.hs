@@ -41,13 +41,26 @@ module Language.SAL.Syntax (
   , ThenRest(..)
   , ElsIf(..)
   -- * Modules
+  , ModuleDeclaration(..)
   , Module(..)
+  , BaseDeclaration(..)
+  , DefinitionOrCommand(..)
+  , SomeCommand(..)
+  , ElseCommand(..)
+  , Renames
+  , NewVarDecl
   , ModulePred(..)
+  -- * Tokens
+  , keywordSet
+  , specialSet
+  , letterSet
+  , digitSet
+  , opCharSet
   )
 where
 
 import Data.Char (chr)
-import Data.List (union, (\\))
+import Data.List ((\\))
 import Data.Data (Data)
 import Data.Typeable (Typeable)
 import Data.List.NonEmpty (NonEmpty)
@@ -73,14 +86,22 @@ data TypeDef
 
 -- | SAL Types
 data Type
-    = TyBasic    BasicType         -- ^ built-in type, e.g. @BOOLEAN@
-    | TyName     Name              -- ^ named type, e.g. @mytype@
-    | TySubRange Bound      Bound  -- ^ subrange type, e.g. @[1..n]@
-    | TySubType  Identifier Type  Expr  -- ^ subset type, e.g. @{ ident : type | expr }@
-    | TyArray    IndexType  Type   -- ^ array type, e.g. @ARRAY idx OF type@
-    | TyFunction VarType    Type   -- ^ function type, e.g. @[ var -> type ]@
-    | TyRecord   VarDecls          -- ^ record type, e.g. @[# {Identifier : Type}+, #]@
-    | TyState    Module         -- ^ module state type, e.g. @MyModule . STATE@
+    -- | built-in type, e.g. @BOOLEAN@
+    = TyBasic    BasicType
+    -- | named type, e.g. @mytype@
+    | TyName     Name
+    -- | subrange type, e.g. @[1..n]@
+    | TySubRange Bound      Bound
+    -- | subset type, e.g. @{ ident : type | expr }@
+    | TySubType  Identifier Type  Expr
+    -- | array type, e.g. @ARRAY idx OF type@
+    | TyArray    IndexType  Type
+    -- | function type, e.g. @[ var -> type ]@
+    | TyFunction VarType    Type
+    -- | record type, e.g. @[# {Identifier : Type}+, #]@
+    | TyRecord   VarDecls
+    -- | module state type, e.g. @MyModule . STATE@
+    | TyState    Module
   DERIVE
 
 -- | Basic built-in mathematical types
@@ -206,19 +227,116 @@ data ElsIf = ElsIf Expr ThenRest
 -- Transitions
 ------------------------------------------------------------------------
 
--- TODO
+-- | Left hand side of a definition
+data Lhs = LhsCurrent [Access]
+         | LhsNext    [Access]
+  DERIVE
+
+-- | Variable access
+data Access = ArrayAccess  Expr        -- @[ Expr ]@
+            | RecordAccess Identifier  -- @.Identifier@
+            | TupleAccess  Numeral     -- @.Numeral@
+  DERIVE
+
+data SimpleDefinition = SimpleDefinition Lhs RhsDefinition
+  DERIVE
+
+data RhsDefinition = RhsExpr      Expr  -- @= Expr@
+                   | RhsSelection Expr  -- @IN Expr@
+  DERIVE
+
+data Definition = DefSimple SimpleDefinition
+                | DefForall VarDecls Definitions  -- @(FORALL (VarDecls): Definitions)@
+  DERIVE
+
+type Definitions = NonEmpty Definition  -- @{Definition}+;@
+
+data GuardedCommand = GuardedCommand Guard Assignments  -- @Guard --> Assignments@
+  DERIVE
+
+type Guard = Expr
+type Assignments = [SimpleDefinition]  -- @{SimpleDefinition}*;@ (optional ; at end)
 
 
 ------------------------------------------------------------------------
 -- Modules
 ------------------------------------------------------------------------
 
--- TODO
-data Module = Module
+-- | Top-level module declaration: @Identifier[VarDecls] : MODULE = Module@
+data ModuleDeclaration =
+    ModuleDeclaration Identifier (Maybe VarDecls) Module
   DERIVE
 
--- | Module predicate
--- XXX what is this for?
+-- | SAL Module
+data Module =
+  -- | @BEGIN BaseDeclarations END@
+    BaseModule [BaseDeclaration]
+  -- | @{Name|QualifiedName} Name[{Expr}+,]@
+  | ModuleInstance (Either Name QualifiedName) (NonEmpty Expr)
+  -- | @Module || Module@
+  | SynchronousComposition Module Module
+  -- | @Module [] Module@
+  | AsynchronousComposition Module Module
+  -- | @(|| (Identifier : IndexType): Module)@
+  | MultiSynchronous  Identifier IndexType Module
+  -- | @([] (Identifier : IndexType): Module)@
+  | MultiAsynchronous Identifier IndexType Module
+  -- | @LOCAL {Identifier}+, IN Module@
+  | Hiding (NonEmpty Identifier) Module
+  -- | @OUTPUT {Identifier}+, IN Module@
+  | NewOutput (NonEmpty Identifier) Module
+  -- | @RENAME Renames IN Module@
+  | Renaming Renames Module
+  -- | @WITH NewVarDecls Module
+  | WithModule (NonEmpty NewVarDecl) Module
+  -- | @OBSERVE Module WITH Module@
+  | ObserveModule Module Module
+  -- | @( Module )@
+  | ParenModule Module
+  DERIVE
+
+data BaseDeclaration =
+    InputDecl  VarDecls  -- @INPUT VarDecls@
+  | OutputDecl VarDecls  -- @OUTPUT VarDecls@
+  | GlobalDecl VarDecls  -- @GLOBAL VarDecls@
+  | LocalDecl  VarDecls  -- @LOCAL VarDecls@
+  | DefDecl    Definitions  -- @DEFINITION Definitions@
+  | InitDecl   (NonEmpty DefinitionOrCommand)  -- @{DOC}+;@ (optional ; at end)
+  | TransDecl  (NonEmpty DefinitionOrCommand)  -- @{DOC}+;@ (optional ; at end)
+  DERIVE
+
+-- | NewVarDecl should be a subtype of BaseDeclaration:
+-- data NewVarDecl =
+--    InputDecl
+--  | OutputDecl
+--  | GlobalDecl
+--  DERIVE
+type NewVarDecl = BaseDeclaration
+
+data DefinitionOrCommand =
+    DOCDef Definition
+  | DOCCom SomeCommands  -- @[ SomeCommands ]@
+  DERIVE
+
+-- | @{SomeCommand}+[] [ [] ElseCommand ]@
+data SomeCommands = SomeCommands (NonEmpty SomeCommand) (Maybe ElseCommand)
+  DERIVE
+
+data SomeCommand =
+  -- | @[ Identifier: ] GuardedCommand@
+    NamedCommand (Maybe Identifier) GuardedCommand
+  -- | @([] (VarDecls): SomeCommand)@
+  | MultiCommand VarDecls SomeCommand
+  DERIVE
+
+-- | @[ Identifier: ] ELSE --> Assignments@
+data ElseCommand = ElseCommand (Maybe Identifier) Assignments
+  DERIVE
+
+-- | @{Lhs TO Lhs}+,@
+type Renames = NonEmpty (Lhs, Lhs)
+
+-- | Part of a 'StatePred' type Expr
 data ModulePred = INIT | TRANS
   DERIVE
 
@@ -247,16 +365,16 @@ keywordSet =
   , "TO", "TRANSITION", "TRUE", "TYPE", "WITH", "XOR"
   ]
 
-specialSet :: [Char]
+specialSet :: String
 specialSet= "()[]{}%,.;:'!#?_"
 
-letterSet :: [Char]
+letterSet :: String
 letterSet = ['a'..'z'] ++ ['A'..'Z']
 
-digitSet :: [Char]
+digitSet :: String
 digitSet = ['0'..'9']
 
-opCharSet :: [Char]
-opCharSet = (map chr [33..126]) \\ nonOp
+opCharSet :: String
+opCharSet = map chr [33..126] \\ nonOp
   where
   nonOp = specialSet ++ letterSet ++ digitSet
