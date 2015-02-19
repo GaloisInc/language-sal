@@ -19,17 +19,18 @@ http://sal.csl.sri.com/doc/language-report.pdf
 
 module Language.SAL.Syntax (
   -- * Types
-    TypeDef(..)
+    Identifier(..)
+  , Numeral(..)
+  , TypeDef(..)
   , Type(..)
   , BasicType(..)
   , VarDecl(..)
+  , VarDecls(..)
   , Bound(..)
-  , ScalarType(..)
-  , DataType(..)
   , Constructor(..)
   , VarType(..)
-  , IndexType(..)
-  , IndexVarDecl(..)
+  , IndexType
+  , IndexVarDecl
   , QualifiedName(..)
   -- * Expressions
   , Expr(..)
@@ -40,16 +41,28 @@ module Language.SAL.Syntax (
   , RecordEntry(..)
   , ThenRest(..)
   , ElsIf(..)
+  -- * Transitions
+  , SimpleDefinition(..)
+  , Access(..)
+  , Lhs(..)
+  , RhsDefinition(..)
+  , Definition(..)
+  , Definitions
+  , Guard
+  , GuardedCommand(..)
+  , ElseCommand(..)
+  , Assignments
   -- * Modules
   , ModuleDeclaration(..)
   , Module(..)
   , BaseDeclaration(..)
   , DefinitionOrCommand(..)
   , SomeCommand(..)
-  , ElseCommand(..)
   , Renames
   , NewVarDecl
   , ModulePred(..)
+  -- * Contexts
+  , ActualParameters(..)
   -- * Tokens
   , keywordSet
   , specialSet
@@ -72,16 +85,20 @@ import Data.List.NonEmpty (NonEmpty)
 
 -- | Identifier for a variable, operator, type, module, context, ...
 --  @Identifier := Letter {Letter | Digit | ? | _}∗ | {Opchar}+@
-type Identifier = String
+newtype Identifier = Identifier { identifier_str :: String }
+  DERIVE
 
 -- | @Numeral := {Digit}+@
-type Numeral = String
+newtype Numeral = Numeral { numeral_val :: Integer }
+  DERIVE
 
 -- | SAL Type Definitions
 data TypeDef
-    = TypeTypeDef   Type
-    | ScalarTypeDef ScalarType
-    | DataTypeDef   DataType
+    = TypeDef    Type
+    -- | @{{Identifier}+, }@
+    | ScalarType (NonEmpty Identifier)
+    -- | @DATATYPE Constructors END@
+    | DataType   (NonEmpty Constructor)
   DERIVE
 
 -- | SAL Types
@@ -122,7 +139,8 @@ data VarDecl = VarDecl Identifier Type
   DERIVE
 
 -- | Comma separated variable declarations
-type VarDecls = NonEmpty VarDecl
+newtype VarDecls = VarDecls { var_decls :: NonEmpty VarDecl }
+  DERIVE
 
 -- | A Bound in a sub-range expression
 data Bound
@@ -130,13 +148,7 @@ data Bound
     | Bound Expr  -- ^ an expression representing a finite bound, render as @Expr@
   DERIVE
 
--- | Scalar type: @{{Identifier}+, }@
-data ScalarType = ScalarType (NonEmpty Identifier)
-  DERIVE
-
--- | Algebraic data type: @DATATYPE Constructors END@
-data DataType    = DataType (NonEmpty Constructor) DERIVE
--- | Data type constructors
+-- | Data type constructors: @Identifier[(VarDecls)]@
 data Constructor = Constructor Identifier (Maybe VarDecls) DERIVE
 
 -- | Variable type declaration: @[identifier :] type@
@@ -145,13 +157,12 @@ data VarType = VarType (Maybe Identifier) Type DERIVE
 -- | IndexType is really a subtype of Type:
 --
 -- > data IndexType = INTEGER | SubRange | ScalarTypeName
-data IndexType = IndexType Type DERIVE
-
--- | Index variable declaration: @Identifier : IndexType@
-data IndexVarDecl = IndexVarDecl Identifier IndexType DERIVE
+--
+type IndexType = Type
+type IndexVarDecl = VarDecl
 
 -- | Name of the form: @Identifier[ {ActualParameters} ]!Identifier@
-data QualifiedName = QualifiedName Identifier ActualParameters Identifier
+data QualifiedName = QualifiedName Identifier (Maybe ActualParameters) Identifier
   DERIVE
 
 
@@ -164,7 +175,7 @@ data Expr
     = NameExpr Name                    -- ^ named expresssion
     | QualifiedNameExpr QualifiedName  -- ^ qualified named expression
     | NextVar Identifier               -- ^ transition variable: @var'@
-    | Numeral Integer
+    | NumLit Numeral                   -- ^ integer literal
     | App Expr Argument                -- ^ function application
     | InfixApp Expr Identifier Expr    -- ^ infix function application
     | ArraySelec Expr Expr             -- ^ array selection: @Expr[Expr]@
@@ -228,8 +239,8 @@ data ElsIf = ElsIf Expr ThenRest
 ------------------------------------------------------------------------
 
 -- | Left hand side of a definition
-data Lhs = LhsCurrent [Access]
-         | LhsNext    [Access]
+data Lhs = LhsCurrent Identifier [Access]
+         | LhsNext    Identifier [Access]
   DERIVE
 
 -- | Variable access
@@ -315,11 +326,9 @@ type NewVarDecl = BaseDeclaration
 
 data DefinitionOrCommand =
     DOCDef Definition
-  | DOCCom SomeCommands  -- @[ SomeCommands ]@
-  DERIVE
-
--- | @{SomeCommand}+[] [ [] ElseCommand ]@
-data SomeCommands = SomeCommands (NonEmpty SomeCommand) (Maybe ElseCommand)
+  -- | @[ SomeCommands ]@
+  -- SomeCommands := @{SomeCommand}+[] [ [] ElseCommand ]@
+  | DOCCom (NonEmpty SomeCommand) (Maybe ElseCommand)
   DERIVE
 
 data SomeCommand =
@@ -345,8 +354,9 @@ data ModulePred = INIT | TRANS
 -- Context
 ------------------------------------------------------------------------
 
--- TODO
-type ActualParameters = ()
+-- | {Type}*, ; {Expr}*,
+data ActualParameters = ActualParameters [Type] [Expr]
+  DERIVE
 
 
 ------------------------------------------------------------------------
