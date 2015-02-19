@@ -20,9 +20,14 @@ import Text.PrettyPrint
 
 import Language.SAL
 
+
 -- | A class for things that can be pretty printed
 class Pretty a where
   pretty :: a -> Doc
+
+------------------------------------------------------------------------
+-- SAL Specific Print Helpers
+------------------------------------------------------------------------
 
 -- | Maybe print a value depending on a Maybe (stolen from
 -- "Language.C.Pretty")
@@ -37,9 +42,22 @@ nonEmptyP s non = hcat . punctuate s . map pretty $ Non.toList non
 listP :: Pretty a => Doc -> [a] -> Doc
 listP s xs = hcat . punctuate s $ map pretty xs
 
+-- | Print an optional list
+maybeListP :: Doc -> [a] -> Doc
+maybeListP _ [] = empty
+maybeListP = listP
+
 -- | Brackets for SAL record syntax
 recBrackets :: Doc -> Doc
 recBrackets d = text "[#" <+> d <+> text "#]"
+
+-- | Field accessor
+dot :: Doc
+dot = char '.'
+
+-- | Set comprehension
+mid :: Doc
+mid = char '|'
 
 ------------------------------------------------------------------------
 -- Pretty Instances
@@ -89,54 +107,76 @@ instance Pretty QualifiedName where
                                <> char '!' <> pretty j
 
 instance Pretty Expr where
-  pretty (NameExpr n) = pretty n
-  pretty (QualifiedNameExpr q) = pretty q
-  pretty (NextVar n) = pretty n <> char '\''
-  pretty (NumLit x) = pretty x
-  pretty (App e a) = undefined  -- XXX argument? pretty e <+> pretty a
-  pretty (InfixApp e op f) = pretty e <+> pretty op <+> pretty f  -- precedence?
-  pretty (ArraySelec e f) = pretty e <> brackets (pretty f)
-  pretty (RecordSelec e i) = pretty e <> char '.' <> pretty i
-  pretty (TupleSelec e x) = pretty e <> char '.' <> pretty x
-  pretty (UpdateExpr e up) = pretty e <+> text "WITH" <+> pretty up
-  pretty (Lambda vs e) = text "LAMBDA" <+> parens (pretty vs) <+> colon <+> pretty e
-  pretty (QuantifiedExpr q vs e) =
+  pretty (NameExpr n)               = pretty n
+  pretty (QualifiedNameExpr q)      = pretty q
+  pretty (NextVar n)                = pretty n <> char '\''
+  pretty (NumLit x)                 = pretty x
+  pretty (App e a)                  = pretty e <> pretty a
+  pretty (InfixApp e op f)          = pretty e <+> pretty op <+> pretty f
+  pretty (ArraySelec e f)           = pretty e <> brackets (pretty f)
+  pretty (RecordSelec e i)          = pretty e <> char '.' <> pretty i
+  pretty (TupleSelec e x)           = pretty e <> char '.' <> pretty x
+  pretty (UpdateExpr e up)          = pretty e <+> text "WITH" <+> pretty up
+  pretty (Lambda vs e)              =
+    text "LAMBDA" <+> parens (pretty vs) <+> colon <+> pretty e
+  pretty (QuantifiedExpr q vs e)    =
     pretty q <+> parens (pretty vs) <+> colon <+> pretty e
-  pretty (LetExpr ls e) =
+  pretty (LetExpr ls e)             =
     text "LET" <+> nonEmptyP comma ls <+> text "IN" <+> pretty e
-  pretty (SetExpr (Left (i, t, e))) = undefined -- XXX
-  pretty (SetExpr (Right sl)) = braces $ nonEmptyP comma sl
-  pretty (ArrayLit v e) = brackets (brackets (pretty v) <+> pretty e)
-  pretty (RecordLit rs) = nonEmptyP comma rs
-  pretty (TupleLit a) = parens $ listP comma a
-  pretty (Conditional e rest) = undefined
-  pretty (GroupedExpr e) = parens (pretty e)
-  pretty (StatePred m p) = pretty m <> char '.' <> pretty p
+  pretty (SetExpr (Left (i, t, e))) =
+    braces $ pretty i <+> colon <+> pretty t <+> mid <+> pretty e
+  pretty (SetExpr (Right sl))       = braces $ nonEmptyP comma sl
+  pretty (ArrayLit v e)             = brackets (brackets (pretty v) <+> pretty e)
+  pretty (RecordLit rs)             = nonEmptyP comma rs
+  pretty (TupleLit a)               = parens $ listP comma a
+  pretty (Conditional e rest)       = undefined
+  pretty (GroupedExpr e)            = parens (pretty e)
+  pretty (StatePred m p)            = pretty m <> char '.' <> pretty p
 
 instance Pretty Update where
-  pretty = undefined
+  pretty (Update u e) = pretty u <+> text ":=" <+> pretty e
+
 instance Pretty UpdatePos where
-  pretty = undefined
+  pretty (ArgUpdate a)   = pretty a
+  pretty (ExprUpdate e)  = brackets (pretty e)
+  pretty (IdentUpdate i) = dot <> pretty i
+  pretty (NumUpdate n)   = dot <> pretty n
+
 instance Pretty Quantifier where
-  pretty = undefined
+  pretty = text . show
+
 instance Pretty LetDecl where
-  pretty = undefined
+  pretty (LetDecl i t e) = pretty i <+> colon <+> pretty t <+> text "=" pretty e
+
 instance Pretty RecordEntry where
-  pretty = undefined
+  pretty (RecordEntry i e) = pretty i <+> text ":=" <+> pretty e
+
 instance Pretty ThenRest where
-  pretty = undefined
+  pretty (ThenRest e els f) = text "THEN" <+> pretty e <+> maybeListP space els
+                          <+> text "ELSE" <+> pretty f <+> text "ENDIF"
+
 instance Pretty ElsIf where
-  pretty = undefined
+  pretty (ElsIf e th) = text "ELSIF" <+> pretty e <+> pretty th
+
 instance Pretty Lhs where
-  pretty = undefined
+  pretty (LhsCurrent i as) = pretty i <> maybeListP empty as
+  pretty (LhsNext    i as) = pretty i <> char '\'' <> maybeListP empty as
+
 instance Pretty Access where
-  pretty = undefined
+  pretty (ArrayAccess e)  = brackets (pretty e)
+  pretty (RecordAccess i) = dot <> pretty i
+  pretty (TupleAccess n)  = dot <> pretty n
+
 instance Pretty SimpleDefinition where
-  pretty = undefined
+  pretty (SimpleDefinition l r) = pretty l <+> pretty r
+
 instance Pretty RhsDefinition where
-  pretty = undefined
+  pretty (RhsExpr e)      = text "=" <+> pretty e
+  pretty (RhsSelection e) = text "IN" <+> pretty e
+
 instance Pretty Definitions where
   pretty (Definitions ls) = nonEmptyP semi ls
+
 instance Pretty Definition where
   pretty = undefined
 instance Pretty GuardedCommand where

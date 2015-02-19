@@ -35,6 +35,7 @@ module Language.SAL.Syntax (
   , QualifiedName(..)
   -- * Expressions
   , Expr(..)
+  , Argument(..)
   , Update(..)
   , UpdatePos(..)
   , Quantifier(..)
@@ -200,11 +201,13 @@ data Expr
     | StatePred Module ModulePred      -- ^ module predicate: @Module . ( INIT | TRANS )@
   DERIVE
 
--- | Comma separated list of expressions
-type Argument = [Expr]
+-- | 'Argument' is a comma separated list of expressions:
+--   @( {Expr}+, )@
+newtype Argument = Argument (NonEmpty Expr)
+  DERIVE
 
 -- | Update expression of the form: @UpdatePosition := Expr@
-data Update = Update (NonEmpty UpdatePos) Expr
+data Update = Update UpdatePos Expr
   DERIVE
 
 -- | Elements which may appear in sequence in the 'UpdatePosition' of an 'Update'
@@ -220,7 +223,7 @@ data UpdatePos
 data Quantifier = FORALL | EXISTS
   DERIVE
 
--- | Let declaration: @{Identifier : Type = Expr}+,@
+-- | Let declaration: @Identifier : Type = Expr@
 data LetDecl = LetDecl Identifier Type Expr
   DERIVE
 
@@ -254,6 +257,7 @@ data Access = ArrayAccess  Expr        -- @[ Expr ]@
             | TupleAccess  Numeral     -- @.Numeral@
   DERIVE
 
+-- | @Lhs RhsDefinition@
 data SimpleDefinition = SimpleDefinition Lhs RhsDefinition
   DERIVE
 
@@ -261,8 +265,9 @@ data RhsDefinition = RhsExpr      Expr  -- @= Expr@
                    | RhsSelection Expr  -- @IN Expr@
   DERIVE
 
-data Definition = DefSimple SimpleDefinition
-                | DefForall VarDecls Definitions  -- @(FORALL (VarDecls): Definitions)@
+data Definition =
+    DefSimple SimpleDefinition      -- @SimpleDefinition@
+  | DefForall VarDecls Definitions  -- @(FORALL (VarDecls): Definitions)@
   DERIVE
 
 newtype Definitions = Definitions (NonEmpty Definition)  -- @{Definition}+;@
