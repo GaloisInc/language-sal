@@ -1,4 +1,4 @@
-name:                sal-lang
+name:                language-sal
 version:             0.1.1
 synopsis:            Haskell to SAL Translator
 description:         Haskell data types representing the SAL language
