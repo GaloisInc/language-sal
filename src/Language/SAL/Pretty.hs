@@ -135,6 +135,8 @@ instance Pretty SimpleDefinition where
   pretty = undefined
 instance Pretty RhsDefinition where
   pretty = undefined
+instance Pretty Definitions where
+  pretty (Definitions ls) = nonEmptyP semi ls
 instance Pretty Definition where
   pretty = undefined
 instance Pretty GuardedCommand where

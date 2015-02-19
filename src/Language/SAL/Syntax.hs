@@ -14,6 +14,7 @@ http://sal.csl.sri.com/doc/language-report.pdf
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 #define DERIVE deriving (Eq, Ord, Show, Typeable, Data)
 
@@ -47,7 +48,7 @@ module Language.SAL.Syntax (
   , Lhs(..)
   , RhsDefinition(..)
   , Definition(..)
-  , Definitions
+  , Definitions(..)
   , Guard
   , GuardedCommand(..)
   , ElseCommand(..)
@@ -75,6 +76,7 @@ where
 import Data.Char (chr)
 import Data.List ((\\))
 import Data.Data (Data)
+import Data.String
 import Data.Typeable (Typeable)
 import Data.List.NonEmpty (NonEmpty)
 
@@ -88,9 +90,12 @@ import Data.List.NonEmpty (NonEmpty)
 newtype Identifier = Identifier { identifier_str :: String }
   DERIVE
 
+instance IsString Identifier where
+  fromString = Identifier
+
 -- | @Numeral := {Digit}+@
 newtype Numeral = Numeral { numeral_val :: Integer }
-  DERIVE
+  deriving (Eq, Ord, Show, Data, Typeable, Num)
 
 -- | SAL Type Definitions
 data TypeDef
@@ -260,7 +265,8 @@ data Definition = DefSimple SimpleDefinition
                 | DefForall VarDecls Definitions  -- @(FORALL (VarDecls): Definitions)@
   DERIVE
 
-type Definitions = NonEmpty Definition  -- @{Definition}+;@
+newtype Definitions = Definitions (NonEmpty Definition)  -- @{Definition}+;@
+  DERIVE
 
 data GuardedCommand = GuardedCommand Guard Assignments  -- @Guard --> Assignments@
   DERIVE
