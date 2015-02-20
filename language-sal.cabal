@@ -15,7 +15,8 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Language.SAL,
-                     Language.SAL.Syntax
+                     Language.SAL.Syntax,
+                     Language.SAL.Pretty
 
   build-depends:     base >= 4.6 && < 4.8,
                      pretty,
