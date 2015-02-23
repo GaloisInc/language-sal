@@ -2,9 +2,8 @@
 Module      : Language.SAL.Pretty
 Description : Pretty printer for SAL syntax
 Copyright   : (c) Galois Inc, 2015
-                  Benjamin F Jones, 2015
 License     : MIT
-Maintainer  : bjones@galois.com
+Maintainer  : Benjamin F Jones <bjones@galois.com>
 Stability   : experimental
 Portability : Yes
 -}
@@ -12,18 +11,30 @@ Portability : Yes
 module Language.SAL.Pretty
   ( -- * Printer class
     Pretty(..)
+    -- * Rendering
+  , renderSAL
+  , renderSALStyle
   ) where
 
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as Non
 import Text.PrettyPrint
 
-import Language.SAL
+import Language.SAL.Syntax
 
 
 -- | A class for things that can be pretty printed
 class Pretty a where
   pretty :: a -> Doc
+
+-- | Render a SAL document in default style
+renderSAL :: Pretty a => a -> String
+renderSAL = render . pretty
+
+-- | Render SAL with 'Text.PrettyPrint.renderStyle'
+renderSALStyle :: Pretty a => Style -> a -> String
+renderSALStyle s d = renderStyle s (pretty d)
+
 
 ------------------------------------------------------------------------
 -- SAL Specific Print Helpers
@@ -73,6 +84,10 @@ sync = text "||"
 -- | Asynchronous composition
 async :: Doc
 async = text "[]"
+
+-- | Transition
+trans :: Doc
+trans = text "-->"
 
 -- | Indent
 ii :: Doc -> Doc
@@ -205,7 +220,7 @@ instance Pretty Definition where
     parens $ text "FORALL" <+> parens (pretty vs) <+> colon <+> pretty ds
 
 instance Pretty GuardedCommand where
-  pretty (GuardedCommand g as) = pretty g <+> text "-->" <+> maybeListP semi as
+  pretty (GuardedCommand g as) = pretty g <+> trans <+> maybeListP semi as
 
 instance Pretty ModuleDeclaration where
   pretty (ModuleDeclaration i mv m) =
@@ -252,10 +267,15 @@ instance Pretty DefinitionOrCommand where
       $+$ rbrack
 
 instance Pretty SomeCommand where
-  pretty = undefined
+  pretty (NamedCommand mi c) = maybeP ((<>text ": ") . pretty) mi <> pretty c
+  pretty (MultiCommand vs c) = parens $ parens (pretty vs) <> colon <+> pretty c
+
 instance Pretty ElseCommand where
-  pretty = undefined
+  pretty (ElseCommand mi a) =
+    maybeP ((<>text ": ") . pretty) mi <> text "ELSE" <+> trans <+> maybeListP semi a
+
 instance Pretty ModulePred where
-  pretty = undefined
+  pretty = text . show
+
 instance Pretty ActualParameters where
   pretty (ActualParameters ts es) = listP comma ts <+> listP comma es

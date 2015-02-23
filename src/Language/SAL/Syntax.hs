@@ -2,9 +2,8 @@
 Module      : Language.SAL.Syntax
 Description : Data types for SAL Syntax
 Copyright   : (c) Galois Inc, 2015
-                  Benjamin F Jones, 2015
 License     : MIT
-Maintainer  : bjones@galois.com
+Maintainer  : Benjamin F Jones <bjones@galois.com>
 Stability   : experimental
 Portability : Yes
 
@@ -16,6 +15,7 @@ http://sal.csl.sri.com/doc/language-report.pdf
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+-- Each data type in this module derives at least: Eq, Ord, Show, Typeable, Data
 #define DERIVE deriving (Eq, Ord, Show, Typeable, Data)
 
 module Language.SAL.Syntax (

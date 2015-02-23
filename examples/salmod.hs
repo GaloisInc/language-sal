@@ -6,7 +6,7 @@ import Data.List.NonEmpty
 import Language.SAL
 
 main :: IO ()
-main = print salmod
+main = putStrLn (renderSAL salmod)
 
 salmod :: Module
 salmod =
@@ -18,7 +18,8 @@ salmod =
                                        (RhsExpr expr))
     defs = DefDecl    $ Definitions (d1 :| [])
   in
-    BaseModule [ ins
-               , outs
-               , defs
-               ]
+    BaseModule
+      [ ins
+      , outs
+      , defs
+      ]
