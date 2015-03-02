@@ -1,7 +1,7 @@
 language-sal
 ============
 
-[![Build Status](https://travis-ci.org/benjaminfjones/language-sal.svg?branch=master)](https://travis-ci.org/benjaminfjones/language-sal)
+[![Build Status](https://travis-ci.org/GaloisInc/language-sal.svg?branch=master)](https://travis-ci.org/GaloisInc/language-sal)
 
 About:
 ------
