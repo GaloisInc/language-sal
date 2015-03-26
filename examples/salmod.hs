@@ -8,7 +8,7 @@ import Language.SAL
 main :: IO ()
 main = putStrLn (renderSAL salmod)
 
-salmod :: Module
+salmod :: ModuleDeclaration
 salmod =
   let
     ins  = InputDecl  $ VarDecls (VarDecl "x" (TyBasic INTEGER) :| [])
@@ -18,8 +18,9 @@ salmod =
                                        (RhsExpr expr))
     defs = DefDecl    $ Definitions (d1 :| [])
   in
-    BaseModule
-      [ ins
-      , outs
-      , defs
-      ]
+    ModuleDeclaration "salmod" Nothing $
+      BaseModule
+        [ ins
+        , outs
+        , defs
+        ]

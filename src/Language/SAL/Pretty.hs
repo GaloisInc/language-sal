@@ -35,6 +35,9 @@ renderSAL = render . pretty
 renderSALStyle :: Pretty a => Style -> a -> String
 renderSALStyle s d = renderStyle s (pretty d)
 
+-- | Set the default indent level
+tabStop :: Int
+tabStop = 4
 
 ------------------------------------------------------------------------
 -- SAL Specific Print Helpers
@@ -225,10 +228,13 @@ instance Pretty GuardedCommand where
 instance Pretty ModuleDeclaration where
   pretty (ModuleDeclaration i mv m) =
     pretty i <> maybeP (brackets . pretty) mv <+> colon
-    <+> text "MODULE" <+> text "=" <+> pretty m
+    <+> text "MODULE" <+> text "=" $+$ pretty m
 
 instance Pretty Module where
-  pretty (BaseModule bs) = text "BEGIN" <+> vcat (map pretty bs) <+> text "END"
+  pretty (BaseModule bs) =
+    text "BEGIN" $+$
+        nest tabStop (vcat (map pretty bs)) $+$
+    text "END"
   pretty (ModuleInstance (Left n) es) = pretty n  <> brackets (neP comma es)
   pretty (ModuleInstance (Right qn) es) = pretty qn <> brackets (neP comma es)
   pretty (SynchronousComposition m n) = pretty m <+> sync <+> pretty n
