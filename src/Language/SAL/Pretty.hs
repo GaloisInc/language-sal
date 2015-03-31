@@ -56,8 +56,13 @@ neP = neP' pretty
 neP' :: (a -> Doc) -> Doc -> NonEmpty a -> Doc
 neP' rend s xs = hcat . punctuate s . map rend $ Non.toList xs
 
+-- | Vertical version of 'neP'
 vneP :: Pretty a => NonEmpty a -> Doc
 vneP xs = vcat . map pretty $ Non.toList xs
+
+-- | Vertical version of 'neP\''
+vneP' :: (a -> Doc) -> Doc -> NonEmpty a -> Doc
+vneP' rend s xs = vcat . punctuate s . map rend $ Non.toList xs
 
 -- | Print a list interspersed with the given separator
 listP :: Pretty a => Doc -> [a] -> Doc
@@ -71,6 +76,10 @@ maybeListP s xs = listP s xs
 -- | Brackets for SAL record syntax
 recBrackets :: Doc -> Doc
 recBrackets d = text "[#" <+> d <+> text "#]"
+
+-- | BEGIN ... END block
+beginEnd :: Doc -> Doc
+beginEnd d = text "BEGIN" $+$ ii d $+$ text "END"
 
 -- | Field accessor
 dot :: Doc
@@ -94,7 +103,7 @@ trans = text "-->"
 
 -- | Indent
 ii :: Doc -> Doc
-ii = nest 2
+ii = nest tabStop
 
 ------------------------------------------------------------------------
 -- Pretty Instances
@@ -107,14 +116,14 @@ instance Pretty Numeral where
 
 instance Pretty TypeDef where
   pretty (TypeDef t)     = pretty t
-  pretty (ScalarType ns) = neP (char ',') ns
+  pretty (ScalarType ns) = braces $ neP (char ',') ns
   pretty (DataType cs)   = text "DATATYPE" <+> neP (char ',') cs <+> text "END"
 
 instance Pretty Type where
   pretty (TyBasic t)       = pretty t
   pretty (TyName t)        = pretty t
   pretty (TySubRange a b)  = brackets $ pretty a <> text ".." <> pretty b
-  pretty (TySubType n t e) = braces $ pretty n <+> colon <+> pretty t <+> char '|'
+  pretty (TySubType n t e) = braces $ pretty n <> colon <+> pretty t <+> char '|'
                                   <+> pretty e
   pretty (TyArray i t)     = text "ARRAY" <+> pretty i <+> text "OF" <+> pretty t
   pretty (TyFunction v t)  = brackets $ pretty v <+> text "->" <+> pretty t
@@ -127,7 +136,7 @@ instance Pretty BasicType where
 instance Pretty VarDecls where
   pretty = neP (char ',') . var_decls
 instance Pretty VarDecl where
-  pretty (VarDecl i t) = pretty i <+> colon <+> pretty t
+  pretty (VarDecl i t) = pretty i <> colon <+> pretty t
 
 instance Pretty Bound where
   pretty Unbounded = char '_'
@@ -155,13 +164,13 @@ instance Pretty Expr where
   pretty (TupleSelec e x)           = pretty e <> char '.' <> pretty x
   pretty (UpdateExpr e up)          = pretty e <+> text "WITH" <+> pretty up
   pretty (Lambda vs e)              =
-    text "LAMBDA" <+> parens (pretty vs) <+> colon <+> pretty e
+    text "LAMBDA" <+> parens (pretty vs) <> colon <+> pretty e
   pretty (QuantifiedExpr q vs e)    =
-    pretty q <+> parens (pretty vs) <+> colon <+> pretty e
+    pretty q <+> parens (pretty vs) <> colon <+> pretty e
   pretty (LetExpr ls e)             =
     text "LET" <+> neP comma ls <+> text "IN" <+> pretty e
   pretty (SetExpr (Left (i, t, e))) =
-    braces $ pretty i <+> colon <+> pretty t <+> mid <+> pretty e
+    braces $ pretty i <> colon <+> pretty t <+> mid <+> pretty e
   pretty (SetExpr (Right sl))       = braces $ neP comma sl
   pretty (ArrayLit v e)             = brackets (brackets (pretty v) <+> pretty e)
   pretty (RecordLit rs)             = neP comma rs
@@ -186,7 +195,7 @@ instance Pretty Quantifier where
   pretty = text . show
 
 instance Pretty LetDecl where
-  pretty (LetDecl i t e) = pretty i <+> colon <+> pretty t <+> text "=" <+> pretty e
+  pretty (LetDecl i t e) = pretty i <> colon <+> pretty t <+> text "=" <+> pretty e
 
 instance Pretty RecordEntry where
   pretty (RecordEntry i e) = pretty i <+> text ":=" <+> pretty e
@@ -220,29 +229,26 @@ instance Pretty Definitions where
 instance Pretty Definition where
   pretty (DefSimple d) = pretty d
   pretty (DefForall vs ds) =
-    parens $ text "FORALL" <+> parens (pretty vs) <+> colon <+> pretty ds
+    parens $ text "FORALL" <+> parens (pretty vs) <> colon <+> pretty ds
 
 instance Pretty GuardedCommand where
   pretty (GuardedCommand g as) = pretty g <+> trans <+> maybeListP semi as
 
 instance Pretty ModuleDeclaration where
   pretty (ModuleDeclaration i mv m) =
-    pretty i <> maybeP (brackets . pretty) mv <+> colon
+    pretty i <> maybeP (brackets . pretty) mv <> colon
     <+> text "MODULE" <+> text "=" $+$ pretty m
 
 instance Pretty Module where
-  pretty (BaseModule bs) =
-    text "BEGIN" $+$
-        nest tabStop (vcat (map pretty bs)) $+$
-    text "END"
+  pretty (BaseModule bs) = beginEnd $ vcat (map pretty bs)
   pretty (ModuleInstance (Left n) es) = pretty n  <> brackets (neP comma es)
   pretty (ModuleInstance (Right qn) es) = pretty qn <> brackets (neP comma es)
   pretty (SynchronousComposition m n) = pretty m <+> sync <+> pretty n
   pretty (AsynchronousComposition m n) = pretty m <+> async <+> pretty n
   pretty (MultiSynchronous i t m) =
-    parens $ sync <+> parens (pretty i <+> colon <+> pretty t) <> colon <+> pretty m
+    parens $ sync <+> parens (pretty i <> colon <+> pretty t) <> colon <+> pretty m
   pretty (MultiAsynchronous i t m) =
-    parens $ sync <+> parens (pretty i <+> colon <+> pretty t) <> colon <+> pretty m
+    parens $ sync <+> parens (pretty i <> colon <+> pretty t) <> colon <+> pretty m
   pretty (Hiding ns m) =
     text "LOCAL" <+> neP comma ns <+> text "IN" <+> pretty m
   pretty (NewOutput ns m) =
@@ -260,9 +266,9 @@ instance Pretty BaseDeclaration where
   pretty (OutputDecl vs) = text "OUTPUT" <+> pretty vs
   pretty (GlobalDecl vs) = text "GLOBAL" <+> pretty vs
   pretty (LocalDecl  vs) = text "LOCAL"  <+> pretty vs
-  pretty (DefDecl    ds) = text "DEFINITION" <+> pretty ds
-  pretty (InitDecl   ds) = neP semi ds
-  pretty (TransDecl  ds) = neP semi ds
+  pretty (DefDecl    ds) = text "DEFINITION" $+$ ii (pretty ds)
+  pretty (InitDecl   ds) = text "INITIALIZATION" $+$ ii (neP semi ds)
+  pretty (TransDecl  ds) = text "TRANSITION" $+$ ii (neP semi ds)
 
 instance Pretty DefinitionOrCommand where
   pretty (DOCDef d) = pretty d
@@ -282,6 +288,51 @@ instance Pretty ElseCommand where
 
 instance Pretty ModulePred where
   pretty = text . show
+
+-- Contexts ------------------------------------------------------------
+
+instance Pretty Context where
+  pretty (Context n mp b) =
+    pretty n <> maybeP pretty mp <> colon <+> text "CONTEXT" <+>
+      equals $+$ pretty b
+
+instance Pretty Parameters where
+  pretty (Parameters ne vds) =
+    brackets (neP comma ne) <> semi <+> maybeListP comma vds
+
+instance Pretty ContextBody where
+  pretty (ContextBody ne) = beginEnd (vneP' pretty semi ne)
+
+instance Pretty Declaration where
+  pretty (ConstantDecl n mvs t me) =
+    pretty n <> maybeP (parens . pretty) mvs <> colon <+> pretty t <+>
+    maybeP ((equals <+>) . pretty) me
+  pretty (TypeDecl n mt) =
+    pretty n <> colon <+> text "TYPE" <+>
+    maybeP ((equals <+>) . pretty) mt
+  pretty (AssertionDecl n af ae) =
+    pretty n <> colon <+> pretty af <+> equals <+> pretty ae
+  pretty (ContextDecl n m ap) =
+    pretty n <> colon <+> text "CONTEXT" <+> equals <+> pretty m <+> braces (pretty ap)
+  pretty (ModuleDecl d) = pretty d
+
+instance Pretty AssertionForm where
+  pretty = text . show
+
+instance Pretty AssertionExpr where
+  pretty (ModuleModels m e) = pretty m <+> text "|-" <+> pretty e
+  pretty (ModuleImplements m1 m2) = pretty m1 <+> text "IMPLEMENTS" <+> pretty m2
+  pretty (PosProp op a1 a2) = pretty op <+> parens (pretty a1 <> comma <> pretty a2)
+  pretty (NegProp a) = text "NOT" <+> pretty a
+  pretty (QuantifiedAssertion q vds ae) =
+    pretty q <+> parens (pretty vds) <> colon <+> pretty ae
+  pretty (AssertExpr e) = pretty e
+
+instance Pretty PropOp where
+  pretty AND  = text "AND"
+  pretty OR   = text "OR"
+  pretty IMPL = text "=>"
+  pretty IFF  = text "<=>"
 
 instance Pretty ActualParameters where
   pretty (ActualParameters ts es) = listP comma ts <+> listP comma es

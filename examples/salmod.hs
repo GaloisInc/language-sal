@@ -6,7 +6,12 @@ import Data.List.NonEmpty
 import Language.SAL
 
 main :: IO ()
-main = putStrLn (renderSAL salmod)
+main = putStrLn (renderSAL ctx)
+
+ctx :: Context
+ctx = Context "salctx" Nothing body
+  where
+  body = ContextBody (ModuleDecl salmod :| [])
 
 salmod :: ModuleDeclaration
 salmod =

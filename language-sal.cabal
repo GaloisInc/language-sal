@@ -1,5 +1,5 @@
 name:                language-sal
-version:             0.1.1
+version:             0.2.0
 synopsis:            Haskell to SAL Translator
 description:         Haskell data types representing the SAL language
                      (http://sal.csl.sri.com) and a pretty printer for
@@ -15,6 +15,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Language.SAL,
+                     Language.SAL.Helpers,
                      Language.SAL.Syntax,
                      Language.SAL.Pretty
 
@@ -31,6 +32,14 @@ executable salmod
                      pretty,
                      semigroups >= 0.16 && < 1.0,
                      language-sal
+  default-language:  Haskell2010
 
+executable mutex
+  hs-source-dirs:    examples
+  main-is:           mutex.hs
+  build-depends:     base >= 4.6 && < 4.8,
+                     pretty,
+                     semigroups >= 0.16 && < 1.0,
+                     language-sal
   default-language:  Haskell2010
 

@@ -9,14 +9,12 @@ Stability   : experimental
 Portability : Yes
 
 See "Language.SAL.Syntax" for details on the syntax representation.
+
+TODO -- better package-wide description here
 -}
 
-module Language.SAL
-  ( -- * SAL Syntax representation
-    module Language.SAL.Syntax
-    -- * Pretty printer
-  , module Language.SAL.Pretty
-  ) where
+module Language.SAL (module X) where
 
-import Language.SAL.Syntax
-import Language.SAL.Pretty
+import Language.SAL.Syntax  as X
+import Language.SAL.Pretty  as X
+import Language.SAL.Helpers as X

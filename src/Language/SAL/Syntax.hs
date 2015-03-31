@@ -9,6 +9,12 @@ Portability : Yes
 
 Haskell encoding of the syntax presented in
 http://sal.csl.sri.com/doc/language-report.pdf
+
+Note that in the concrete syntax below (things in @typewriter font@) the use of
+[]'s and {}'s sometimes mean literal brackets/braces and sometimes mean
+_optional_ or _set of_. This is confusing, so we use [_ and {_ where appropriate to
+denote a literal bracket or brace.
+
 -}
 
 {-# LANGUAGE CPP #-}
@@ -64,6 +70,13 @@ module Language.SAL.Syntax (
   , NewVarDecl
   , ModulePred(..)
   -- * Contexts
+  , Context(..)
+  , Parameters(..)
+  , ContextBody(..)
+  , Declaration(..)
+  , AssertionForm(..)
+  , AssertionExpr(..)
+  , PropOp(..)
   , ActualParameters(..)
   -- * Tokens
   , keywordSet
@@ -201,6 +214,9 @@ data Expr
     | StatePred Module ModulePred      -- ^ module predicate: @Module . ( INIT | TRANS )@
   DERIVE
 
+instance IsString Expr where
+  fromString = NameExpr . fromString
+
 -- | 'Argument' is a comma separated list of expressions:
 --   @( {Expr}+, )@
 newtype Argument = Argument (NonEmpty Expr)
@@ -247,22 +263,24 @@ data ElsIf = ElsIf Expr ThenRest
 ------------------------------------------------------------------------
 
 -- | Left hand side of a definition
-data Lhs = LhsCurrent Identifier [Access]
-         | LhsNext    Identifier [Access]
+data Lhs = LhsCurrent Identifier [Access]  -- ^ @Identifier@
+         | LhsNext    Identifier [Access]  -- ^ @Identifier'@
+  DERIVE
+
+-- | Right hand side of a definition, either deterministic assignment or
+-- non-deterministic.
+data RhsDefinition = RhsExpr      Expr  -- @= Expr@
+                   | RhsSelection Expr  -- @IN Expr@
   DERIVE
 
 -- | Variable access
-data Access = ArrayAccess  Expr        -- @[ Expr ]@
+data Access = ArrayAccess  Expr        -- @[_ Expr _]@
             | RecordAccess Identifier  -- @.Identifier@
             | TupleAccess  Numeral     -- @.Numeral@
   DERIVE
 
 -- | @Lhs RhsDefinition@
 data SimpleDefinition = SimpleDefinition Lhs RhsDefinition
-  DERIVE
-
-data RhsDefinition = RhsExpr      Expr  -- @= Expr@
-                   | RhsSelection Expr  -- @IN Expr@
   DERIVE
 
 data Definition =
@@ -337,19 +355,19 @@ type NewVarDecl = BaseDeclaration
 
 data DefinitionOrCommand =
     DOCDef Definition
-  -- | @[ SomeCommands ]@
-  -- SomeCommands := @{SomeCommand}+[] [ [] ElseCommand ]@
+    -- ^ @Definition@
   | DOCCom (NonEmpty SomeCommand) (Maybe ElseCommand)
+    -- ^ @[_ {SomeCommand}+[__] [ [__] ElseCommand ] _]@
   DERIVE
 
 data SomeCommand =
-  -- | @[ Identifier: ] GuardedCommand@
+  -- | @[ Identifier : ] GuardedCommand@
     NamedCommand (Maybe Identifier) GuardedCommand
-  -- | @([] (VarDecls): SomeCommand)@
+  -- | @([__] (VarDecls): SomeCommand)@
   | MultiCommand VarDecls SomeCommand
   DERIVE
 
--- | @[ Identifier: ] ELSE --> Assignments@
+-- | @[ Identifier : ] ELSE --> Assignments@
 data ElseCommand = ElseCommand (Maybe Identifier) Assignments
   DERIVE
 
@@ -365,7 +383,62 @@ data ModulePred = INIT | TRANS
 -- Context
 ------------------------------------------------------------------------
 
--- | {Type}*, ; {Expr}*,
+-- | @Identifier [ {Parameters} ] : CONTEXT = ContextBody@
+data Context = Context Identifier (Maybe Parameters) ContextBody
+  DERIVE
+
+-- | @[ {Identifier}+, : TYPE ] ; {VarDecls}*,
+data Parameters = Parameters (NonEmpty Identifier) [VarDecls]
+  DERIVE
+
+-- | @BEGIN { Declaration; }+ END@
+data ContextBody = ContextBody (NonEmpty Declaration)
+  DERIVE
+
+-- | Declaration in a context body
+data Declaration =
+    ConstantDecl  Identifier (Maybe VarDecls) Type (Maybe Expr)
+    -- ^ @Identifier[(VarDecls)] : Type [ = Expr ]@
+  | TypeDecl      Identifier (Maybe TypeDef)
+    -- ^ @Identifier : TYPE [ = TypeDef ]@
+  | AssertionDecl Identifier AssertionForm    AssertionExpr
+    -- ^ @Identifier : AssertionForm = AssertionExpr@
+  | ContextDecl   Identifier Identifier       ActualParameters
+  | ModuleDecl    ModuleDeclaration
+  DERIVE
+
+-- | Different classes of assertion
+data AssertionForm =
+    OBLIGATION
+  | CLAIM
+  | LEMMA
+  | THEOREM
+  DERIVE
+
+-- | Assertion Expressions allow properties to be stated.
+data AssertionExpr =
+    ModuleModels     Module Expr
+    -- ^ @Module |- Expr@
+  | ModuleImplements Module Module
+    -- ^ @Module IMPLEMENTS Module@
+  | PosProp PropOp AssertionExpr AssertionExpr
+    -- ^ @PropOp ( AssertionExpr, AsserstionExpr)@
+  | NegProp AssertionExpr
+    -- ^ @NOT AssertionExpr@
+  | QuantifiedAssertion Quantifier VarDecls AssertionExpr
+    -- ^ @Quantifier ( VarDecls ) : AssertionExpr@
+  | AssertExpr Expr
+  DERIVE
+
+-- | Propositional operators allowed in 'AssertionExpr'
+data PropOp =
+    AND   -- ^ @AND@
+  | OR    -- ^ @OR@
+  | IMPL  -- ^ implication @=>@
+  | IFF   -- ^ if and only if @<=>@
+  DERIVE
+
+-- | @{Type}*, ; {Expr}*,@
 data ActualParameters = ActualParameters [Type] [Expr]
   DERIVE
 
