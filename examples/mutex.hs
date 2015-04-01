@@ -9,7 +9,7 @@ main :: IO ()
 main = putStrLn (renderSAL ctx)
 
 ctx :: Context
-ctx = Context "peterson" Nothing body
+ctx = Context "mutex" Nothing body
   where
   body = ContextBody $ fromList [tyDecl, modDecl]
   tyDecl = TypeDecl "PC" (Just tyDef)
@@ -39,7 +39,7 @@ proc = ModuleDeclaration "process" modParams $ BaseModule [ins, outs, ini, trans
   trWake = NamedCommand (Just "wakening") $
     GuardedCommand gWake aWake
   gWake = "pc1" .= "sleeping"
-  aWake = [ lhs  "pc1" #= rhs "trying"
+  aWake = [ lhs'  "pc1" #= rhs "trying"
           , lhs' "x1"  #= rhs ("x2" .= "tval")
           ]
 

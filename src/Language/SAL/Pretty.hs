@@ -18,6 +18,7 @@ module Language.SAL.Pretty
 
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as Non
+import Data.List (intersperse)
 import Text.PrettyPrint
 
 import Language.SAL.Syntax
@@ -274,17 +275,24 @@ instance Pretty DefinitionOrCommand where
   pretty (DOCDef d) = pretty d
   pretty (DOCCom cs mc) =
     lbrack
-      $+$ ii (  (vcat . punctuate async . map pretty $ Non.toList cs)
-             $$ maybeP pretty mc )
+      $+$ (vcat . intersperse async . map (ii . pretty) $ Non.toList cs)
+      $$  ii (maybeP pretty mc)
       $+$ rbrack
 
 instance Pretty SomeCommand where
-  pretty (NamedCommand mi c) = maybeP ((<>text ": ") . pretty) mi <> pretty c
+  pretty (NamedCommand mi c) =
+    case mi of
+      Just n -> pretty n <> colon $+$ ii (pretty c)
+      Nothing -> pretty c
   pretty (MultiCommand vs c) = parens $ parens (pretty vs) <> colon <+> pretty c
 
 instance Pretty ElseCommand where
   pretty (ElseCommand mi a) =
-    maybeP ((<>text ": ") . pretty) mi <> text "ELSE" <+> trans <+> maybeListP semi a
+      case mi of
+        Just n -> pretty n <> colon $+$ ii elseCom
+        Nothing -> elseCom
+    where
+    elseCom = text "ELSE" <+> trans <+> maybeListP semi a
 
 instance Pretty ModulePred where
   pretty = text . show
@@ -301,7 +309,7 @@ instance Pretty Parameters where
     brackets (neP comma ne) <> semi <+> maybeListP comma vds
 
 instance Pretty ContextBody where
-  pretty (ContextBody ne) = beginEnd (vneP' pretty semi ne)
+  pretty (ContextBody ne) = beginEnd $ vneP' ((<> semi) . pretty) empty ne
 
 instance Pretty Declaration where
   pretty (ConstantDecl n mvs t me) =

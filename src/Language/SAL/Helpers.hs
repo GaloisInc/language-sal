@@ -79,7 +79,7 @@ x .>= y = InfixApp x ">=" y
 x .&& y = InfixApp x "AND" y
 
 (.||) :: Expr -> Expr -> Expr
-x .|| y = InfixApp x "||" y
+x .|| y = InfixApp x "OR" y
 
 (.=>) :: Expr -> Expr -> Expr
 x .=> y = InfixApp x "=>" y
